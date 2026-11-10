@@ -1,0 +1,87 @@
+name: Windows hosted runner availability
+
+'on':
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe ${{ matrix.architecture }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 3
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - runner: windows-2025
+            architecture: x64
+          - runner: windows-11-arm
+            architecture: ARM64
+    steps:
+      - name: Observe runner capabilities only
+        shell: pwsh
+        env:
+          PROBE_RUNNER_LABEL: ${{ matrix.runner }}
+          PROBE_REQUESTED_ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $desktop = [ordered]@{
+            status = 'unknown'
+            win32Error = $null
+            exceptionType = $null
+          }
+          try {
+            Add-Type -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          public static class PawseDesktopAvailability {
+              [DllImport("user32.dll", SetLastError = true)]
+              public static extern IntPtr OpenInputDesktop(
+                  uint flags, [MarshalAs(UnmanagedType.Bool)] bool inherit,
+                  uint desiredAccess);
+              [DllImport("user32.dll", SetLastError = true)]
+              [return: MarshalAs(UnmanagedType.Bool)]
+              public static extern bool CloseDesktop(IntPtr desktop);
+          }
+          '@
+            # DESKTOP_READOBJECTS only; no input, switching, or write access.
+            $handle = [PawseDesktopAvailability]::OpenInputDesktop(0, $false, 0x0001)
+            if ($handle -eq [IntPtr]::Zero) {
+              $desktop.status = 'not_available'
+              $desktop.win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+            } else {
+              try {
+                $desktop.status = 'available'
+              } finally {
+                if (-not [PawseDesktopAvailability]::CloseDesktop($handle)) {
+                  $desktop.status = 'close_failed'
+                  $desktop.win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+                }
+              }
+            }
+          } catch {
+            $desktop.status = 'unknown'
+            $desktop.exceptionType = $_.Exception.GetType().FullName
+          }
+          $result = [ordered]@{
+            schemaVersion = 1
+            purpose = 'runner_availability_only'
+            runnerLabel = $env:PROBE_RUNNER_LABEL
+            requestedArchitecture = $env:PROBE_REQUESTED_ARCHITECTURE
+            os = [Runtime.InteropServices.RuntimeInformation]::OSDescription
+            osArchitecture = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+            processArchitecture = [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString()
+            processSessionId = [Diagnostics.Process]::GetCurrentProcess().SessionId
+            userInteractive = [Environment]::UserInteractive
+            inputDesktop = $desktop
+            nativeApplicationTests = [ordered]@{
+              status = 'SKIP'
+              reason = 'No application source, binary, or native test harness is present.'
+            }
+          }
+          $json = $result | ConvertTo-Json -Depth 5
+          Write-Output $json
+          $json | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
