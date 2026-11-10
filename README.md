@@ -1,44 +1,18 @@
-# Pawse release infrastructure
+# Pawse downloads
 
-Local scaffold for the proposed public `ess007/pawse-releases` repository. This is
-not a public release, and no application download is available here yet.
+Keyboard paused. Cat welcome. Free native apps by BWE Studio.
 
-## Decision and plan
+**[Get Pawse at pawse.bwe.one](https://pawse.bwe.one/#download)**
 
-The canonical application remains the private `ess007/pawse-windows` repository,
-with the current source checkpoint `58cff611` on `main`. Keep application source,
-secrets, private QA harnesses, and binaries out of this scaffold. A future public
-repository may host approved binary downloads and release infrastructure; that
-requires a separate reviewed release workflow and approved assets.
+- **Mac 1.1.2:** universal Apple silicon/Intel app, Developer ID signed and Apple notarized. Download from the website.
+- **[Windows 1.0.0 preview 1](https://github.com/ess007/pawse-releases/releases/tag/windows-v1.0.0-preview.1):** x64 installer plus ARM64 and x64 portable ZIPs, quick-start guide and SHA-256 checksums.
 
-The owner does not have a Windows computer. Before designing hosted Windows
-testing, run only a manually dispatched availability probe on the standard
-GitHub-hosted `windows-2025` x64 and `windows-11-arm` ARM64 runners. These are the
-standard runner labels intended for free public-repository Actions usage; do not
-substitute paid larger runners. Confirm repository visibility and current GitHub
-runner eligibility before dispatching. This scaffold creates no repository and
-does not dispatch or publish anything.
+The Windows preview is **unsigned**. Testing covers Windows 11 ARM64 in a VM, including x64 emulation, core/UI logic, keyboard-hook smoke, per-user installation, manual lock/unlock/recovery and standard uninstall. Native Intel/AMD PCs, physical keyboards, login/upgrade lifecycle and additional display/accessibility configurations still need testing. See the release notes for precise scope. Respect your device security policy; checksums establish file integrity, not trusted publisher identity.
 
-The first probe observes OS and process architecture, process session ID,
-`Environment.UserInteractive`, and whether a read-only `OpenInputDesktop` handle
-can be obtained. It immediately closes any handle. It does not inject input,
-automate UI, capture screenshots, change permissions, alter policies, or modify
-the machine. It has no action dependencies, checkout, artifact uploads, secrets,
-push/PR triggers, or application files. Each matrix job has a three-minute limit;
-at most two jobs run concurrently, with fail-fast disabled.
+Pawse runs locally without an account or typed-text collection. It guards against accidental pet input and is not a security lock. Save work before trying the preview.
 
-## Evidence boundary
+This public repository hosts binary releases and bounded release infrastructure. Application source remains in the private canonical repository; binary release assets are attached to releases rather than committed to Git.
 
-The JSON in the console and job summary describes runner availability only.
-`OpenInputDesktop` availability and `UserInteractive` do not establish that a
-usable interactive desktop exists or that native application behavior works.
-Native application tests are explicitly `SKIP`. A green probe job is not a native
-test pass, architecture compatibility result, signed release, or release approval.
+## Runner availability probe
 
-If a runner is unavailable or the probe cannot query the desktop, retain that
-result as unavailable or unknown. Do not weaken the restrictions to obtain a
-green result. Review these observations before proposing actual hosted tests.
-
-Only `.github/workflows/windows-probe.yml` and this README belong to this first
-scaffold. No git commit, remote creation, push, dispatch, or publication is part of
-the local preparation step.
+The existing manual-only GitHub workflow is an availability probe, not application QA. Its x64/ARM64 jobs did not run because of an account billing restriction. No passing hosted-runner result is claimed; local Windows VM evidence is documented in the release notes. The probe does not inject input, alter policies or install the app.
